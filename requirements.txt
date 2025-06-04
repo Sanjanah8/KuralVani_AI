@@ -1,8 +1,7 @@
 streamlit
-librosa
 tensorflow
-scikit-learn
+librosa
 numpy
+scikit-learn
+h5py
 pandas
-
-
