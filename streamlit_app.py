@@ -1,62 +1,58 @@
 import streamlit as st
-import numpy as np
-import librosa
 import tensorflow as tf
+import numpy as np
 import pickle
-import os
 
-# Load the model and encoder
-MODEL_PATH = "models/tamil_slang_model.h5"
-ENCODER_PATH = "models/label_encoder.pkl"
+# ----------- Load your model and label encoder -----------
 
-model = tf.keras.models.load_model(MODEL_PATH)
-with open(ENCODER_PATH, 'rb') as f:
-    label_encoder = pickle.load(f)
+@st.cache_resource(show_spinner=True)
+def load_model():
+    model = tf.keras.models.load_model('model.h5')
+    return model
 
-# Extract MFCC features with fixed shape (40, 40, 1)
-def extract_features(audio_file, max_pad_len=40):
-    y, sr = librosa.load(audio_file, sr=22050)
-    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-    
-    if mfcc.shape[1] < max_pad_len:
-        pad_width = max_pad_len - mfcc.shape[1]
-        mfcc = np.pad(mfcc, pad_width=((0, 0), (0, pad_width)), mode='constant')
-    else:
-        mfcc = mfcc[:, :max_pad_len]
+@st.cache_resource(show_spinner=True)
+def load_label_encoder():
+    with open('label_encoder.pkl', 'rb') as f:
+        le = pickle.load(f)
+    return le
 
-    mfcc = mfcc[np.newaxis, ..., np.newaxis]  # (1, 40, 40, 1)
-    return mfcc
+model = load_model()
+label_encoder = load_label_encoder()
 
-# Streamlit UI setup
-st.set_page_config(page_title="தமிழ் வட்டார வழக்கு கண்டறிதல்", layout="centered")
-st.title("📢 Tamil Dialect Classifier (தமிழ் வட்டார வழக்கு)")
-st.write("Upload a Tamil audio file (WAV/MP3) to predict its regional dialect.")
+# ----------- App UI -----------
 
-audio_file = st.file_uploader("🎤 Upload Audio", type=["wav", "mp3"])
+st.title("KuralVani AI - Tamil Slang Dialect Detection")
+
+st.write("""
+Upload a Tamil audio file (.wav) and the app will classify it into one of five dialects using a deep learning model.
+""")
+
+audio_file = st.file_uploader("Upload Audio", type=["wav"])
+
+# ----------- Helper: extract features (MFCC) -----------
+
+import librosa
+
+def extract_mfcc(file):
+    y, sr = librosa.load(file, sr=22050)  # Load audio
+    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
+    mfccs_scaled = np.mean(mfccs.T, axis=0)
+    return mfccs_scaled.reshape(1, -1)  # Shape (1, 40)
+
+# ----------- Predict button -----------
 
 if audio_file is not None:
-    st.audio(audio_file)
-
-    # Save uploaded file temporarily
-    with open("temp_audio.wav", "wb") as f:
-        f.write(audio_file.read())
-
-    try:
-        features = extract_features("temp_audio.wav")
-        prediction = model.predict(features)
-
-        if isinstance(prediction, list):
-            prediction = prediction[0]
-
-        predicted_class = np.argmax(prediction, axis=1)
-        label = label_encoder.inverse_transform(predicted_class)
-        st.success(f"🗣️ Predicted Dialect: **{label[0]}**")
-
-    except Exception as e:
-        # Fallback output on any error
-        st.warning("⚠️ Could not predict accurately, showing fallback output.")
-        st.success("🗣️ Predicted Dialect: **Unknown**")
-
-    finally:
-        if os.path.exists("temp_audio.wav"):
-            os.remove("temp_audio.wav")
+    st.audio(audio_file, format='audio/wav')
+    
+    if st.button("Predict Dialect"):
+        with st.spinner("Extracting features and predicting..."):
+            # Extract MFCC features from uploaded file
+            mfcc_features = extract_mfcc(audio_file)
+            
+            # Predict with the model
+            preds = model.predict(mfcc_features)
+            pred_class_index = np.argmax(preds, axis=1)[0]
+            pred_class_label = label_encoder.inverse_transform([pred_class_index])[0]
+            
+            st.success(f"Predicted Dialect: **{pred_class_label}**")
+            st.write(f"Confidence: {preds[0][pred_class_index]*100:.2f}%")
