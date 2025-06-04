@@ -2,6 +2,7 @@ import streamlit as st
 import tensorflow as tf
 import numpy as np
 import pickle
+import librosa
 
 # ----------- Load your model and label encoder -----------
 
@@ -31,13 +32,19 @@ audio_file = st.file_uploader("Upload Audio", type=["wav"])
 
 # ----------- Helper: extract features (MFCC) -----------
 
-import librosa
-
-def extract_mfcc(file):
-    y, sr = librosa.load(file, sr=22050)  # Load audio
+def extract_mfcc(file, max_pad_len=40):
+    y, sr = librosa.load(file, sr=22050)
     mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-    mfccs_scaled = np.mean(mfccs.T, axis=0)
-    return mfccs_scaled.reshape(1, -1)  # Shape (1, 40)
+
+    if mfccs.shape[1] < max_pad_len:
+        pad_width = max_pad_len - mfccs.shape[1]
+        mfccs = np.pad(mfccs, pad_width=((0, 0), (0, pad_width)), mode='constant')
+    else:
+        mfccs = mfccs[:, :max_pad_len]
+
+    # Reshape to (1, 40, 40, 1) to match model input
+    mfccs = mfccs[np.newaxis, ..., np.newaxis]
+    return mfccs
 
 # ----------- Predict button -----------
 
@@ -46,13 +53,15 @@ if audio_file is not None:
     
     if st.button("Predict Dialect"):
         with st.spinner("Extracting features and predicting..."):
-            # Extract MFCC features from uploaded file
-            mfcc_features = extract_mfcc(audio_file)
-            
-            # Predict with the model
-            preds = model.predict(mfcc_features)
-            pred_class_index = np.argmax(preds, axis=1)[0]
-            pred_class_label = label_encoder.inverse_transform([pred_class_index])[0]
-            
-            st.success(f"Predicted Dialect: **{pred_class_label}**")
-            st.write(f"Confidence: {preds[0][pred_class_index]*100:.2f}%")
+            try:
+                mfcc_features = extract_mfcc(audio_file)
+                preds = model.predict(mfcc_features)
+                pred_class_index = np.argmax(preds, axis=1)[0]
+                pred_class_label = label_encoder.inverse_transform([pred_class_index])[0]
+                confidence = preds[0][pred_class_index] * 100
+
+                st.success(f"Predicted Dialect: **{pred_class_label}**")
+                st.write(f"Confidence: {confidence:.2f}%")
+
+            except Exception as e:
+                st.error(f"Error during prediction: {e}")
