@@ -1,60 +1,67 @@
-# streamlit_app.py
-
 import streamlit as st
-import librosa
 import numpy as np
+import librosa
 import tensorflow as tf
 import pickle
+import os
+import base64
 
-# Load model and label encoder once (put your actual model paths here)
+# File paths
 MODEL_PATH = "models/tamil_slang_model.h5"
 ENCODER_PATH = "models/label_encoder.pkl"
+LOGO_PATH = "assets/tamil-logo.png"
 
-@st.cache_resource  # Cache so model loads once
-def load_model_and_encoder():
-    model = tf.keras.models.load_model(MODEL_PATH)
-    with open(ENCODER_PATH, "rb") as f:
-        label_encoder = pickle.load(f)
-    return model, label_encoder
+# Load model and label encoder
+model = tf.keras.models.load_model(MODEL_PATH)
+with open(ENCODER_PATH, 'rb') as f:
+    label_encoder = pickle.load(f)
 
-model, label_encoder = load_model_and_encoder()
+# Feature extraction
+def extract_features(audio_file):
+    y, sr = librosa.load(audio_file, sr=22050)
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
+    mfcc_mean = np.mean(mfcc.T, axis=0)
+    return mfcc_mean
 
-def extract_mfcc(file):
-    signal, sr = librosa.load(file, sr=22050)
-    mfcc = librosa.feature.mfcc(y=signal, sr=sr, n_mfcc=40)
+# UI settings
+st.set_page_config(page_title="KuralVani AI - தமிழ் வட்டார வழக்கு", layout="centered")
 
-    if mfcc.shape[1] < 40:
-        mfcc = np.pad(mfcc, ((0,0), (0, 40 - mfcc.shape[1])), mode='constant')
-    else:
-        mfcc = mfcc[:, :40]
+# Custom styles
+st.markdown("""
+    <style>
+    .title { text-align: center; font-size: 36px; color: #8e44ad; font-weight: bold; font-family: 'Noto Sans Tamil', sans-serif; }
+    .sub { font-size: 20px; text-align: center; color: #555; margin-bottom: 20px; }
+    </style>
+""", unsafe_allow_html=True)
 
-    mfcc = (mfcc - np.mean(mfcc)) / np.std(mfcc)
-    mfcc = mfcc.reshape(1, 40, 40, 1).astype(np.float32)
-    return mfcc
+# Logo
+if os.path.exists(LOGO_PATH):
+    st.image(LOGO_PATH, width=120)
 
-def predict_dialect(audio_file):
-    mfcc_input = extract_mfcc(audio_file)
-    # Debug print, comment out in production
-    # st.write("MFCC input shape:", mfcc_input.shape)
+# Title
+st.markdown('<div class="title">KuralVani AI</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub">தமிழ் வட்டார வழக்கு கண்டறிதல் (Tamil Dialect Prediction from Audio)</div>', unsafe_allow_html=True)
 
-    predictions = model.predict(mfcc_input)
-    predicted_index = np.argmax(predictions)
-    predicted_label = label_encoder.inverse_transform([predicted_index])[0]
-    confidence = predictions[0][predicted_index]
-    return predicted_label, confidence
-
-# --- Streamlit UI starts here ---
-
-st.title("Tamil Dialect / Slang Detection")
-st.write("Upload a Tamil audio clip to detect the dialect/slang")
-
-uploaded_file = st.file_uploader("Choose an audio file (.wav)", type=["wav"])
+# Upload
+uploaded_file = st.file_uploader("🎤 உங்கள் தமிழ் ஆடியோவை பதிவேற்றுங்கள்", type=["wav", "mp3"])
 
 if uploaded_file is not None:
+    st.audio(uploaded_file)
+    with open("temp_audio.wav", "wb") as f:
+        f.write(uploaded_file.read())
+
     try:
-        # Predict on uploaded file
-        label, confidence = predict_dialect(uploaded_file)
-        st.success(f"Predicted Dialect: **{label}**")
-        st.info(f"Confidence: {confidence*100:.2f}%")
+        features = extract_features("temp_audio.wav")
+        features = np.expand_dims(features, axis=0)
+        prediction = model.predict(features)
+        predicted_class = np.argmax(prediction, axis=1)
+        label = label_encoder.inverse_transform(predicted_class)[0]
+        st.success(f"🔊 கண்டறியப்பட்ட வட்டாரம்: **{label}**")
+
+        # Download prediction as .txt
+        result_text = f"KuralVani AI Prediction: {label}"
+        b64 = base64.b64encode(result_text.encode()).decode()
+        href = f'<a href="data:file/txt;base64,{b64}" download="kuralvani_prediction.txt">📥 Download Result</a>'
+        st.markdown(href, unsafe_allow_html=True)
     except Exception as e:
-        st.error(f"Error processing audio: {str(e)}")
+        st.error(f"⚠️ பிழை ஏற்பட்டது: {e}")
