@@ -94,29 +94,25 @@ audio_file = st.file_uploader(
     type=['wav', 'mp3']
 )
 
-# --- Fixed MFCC extractor ---
 def extract_mfcc(file):
     signal, sr = librosa.load(file, sr=22050)
-    mfccs = librosa.feature.mfcc(y=signal, sr=sr, n_mfcc=40)
+    mfcc = librosa.feature.mfcc(y=signal, sr=sr, n_mfcc=40)
 
-    # Pad or truncate to 64x64
-    if mfccs.shape[1] < 64:
-        pad_width = 64 - mfccs.shape[1]
-        mfccs = np.pad(mfccs, pad_width=((0, 0), (0, pad_width)), mode='constant')
+    # Pad or truncate to 40 frames
+    if mfcc.shape[1] < 40:
+        pad_width = 40 - mfcc.shape[1]
+        mfcc = np.pad(mfcc, pad_width=((0, 0), (0, pad_width)), mode='constant')
     else:
-        mfccs = mfccs[:, :64]
+        mfcc = mfcc[:, :40]
 
-    if mfccs.shape[0] < 64:
-        pad_height = 64 - mfccs.shape[0]
-        mfccs = np.pad(mfccs, pad_width=((0, pad_height), (0, 0)), mode='constant')
-    else:
-        mfccs = mfccs[:64, :]
+    # Normalize
+    mfcc = (mfcc - np.mean(mfcc)) / np.std(mfcc)
 
-    mfccs = (mfccs - np.mean(mfccs)) / np.std(mfccs)
-    mfccs = mfccs.flatten()  # shape: (4096,)
-    return mfccs.reshape(1, -1)  # shape: (1, 4096)
+    # Reshape to (40, 40, 1)
+    mfcc = mfcc.reshape(40, 40, 1)
+    return np.expand_dims(mfcc, axis=0)  # Shape (1, 40, 40, 1)
 
-# --- Dialect Mapping ---
+# Mapping English labels to Tamil
 dialect_map = {
     'chennai': 'சென்னை (Chennai)',
     'madurai': 'மதுரை (Madurai)',
@@ -125,7 +121,7 @@ dialect_map = {
     'standard': 'ஸ்டான்டர்டு தமிழ் (Standard Tamil)'
 }
 
-# --- Prediction ---
+# --- Main prediction block ---
 if audio_file is not None:
     with st.spinner("பதிலுக்கு கணினி கணக்கிடுகிறது... / Computing prediction..."):
         st.markdown(
@@ -136,11 +132,13 @@ if audio_file is not None:
         )
 
         try:
-            mfcc_features = extract_mfcc(audio_file)
-            prediction = model.predict(mfcc_features)
+            mfcc_input = extract_mfcc(audio_file)
+            prediction = model.predict(mfcc_input)
+
             pred_index = np.argmax(prediction)
             pred_label = label_encoder.inverse_transform([pred_index])[0]
             confidence = prediction[0][pred_index] * 100
+
             pred_label_tamil = dialect_map.get(pred_label.lower(), pred_label)
 
             st.markdown(f'<p class="result">வட்டார வழக்கு: {pred_label_tamil} / Dialect: {pred_label_tamil}</p>', unsafe_allow_html=True)
