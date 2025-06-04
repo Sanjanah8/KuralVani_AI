@@ -1,5 +1,3 @@
-# streamlit_app.py
-
 import streamlit as st
 import numpy as np
 import librosa
@@ -15,12 +13,21 @@ model = tf.keras.models.load_model(MODEL_PATH)
 with open(ENCODER_PATH, 'rb') as f:
     label_encoder = pickle.load(f)
 
-# Function to extract MFCCs
-def extract_features(audio_file):
+# Function to extract MFCC features with fixed shape (40, 40, 1)
+def extract_features(audio_file, max_pad_len=40):
     y, sr = librosa.load(audio_file, sr=22050)
     mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-    mfcc_mean = np.mean(mfcc.T, axis=0)
-    return mfcc_mean
+    
+    # Pad or truncate mfcc to max_pad_len frames
+    if mfcc.shape[1] < max_pad_len:
+        pad_width = max_pad_len - mfcc.shape[1]
+        mfcc = np.pad(mfcc, pad_width=((0, 0), (0, pad_width)), mode='constant')
+    else:
+        mfcc = mfcc[:, :max_pad_len]
+
+    # Reshape to (1, 40, 40, 1) for model input
+    mfcc = mfcc[np.newaxis, ..., np.newaxis]
+    return mfcc
 
 # Streamlit UI
 st.set_page_config(page_title="தமிழ் வட்டார வழக்கு கண்டறிதல்", layout="centered")
@@ -33,13 +40,15 @@ audio_file = st.file_uploader("🎤 Upload Audio", type=["wav", "mp3"])
 if audio_file is not None:
     st.audio(audio_file)
 
+    # Save uploaded file temporarily
     with open("temp_audio.wav", "wb") as f:
         f.write(audio_file.read())
 
     try:
+        # Extract features with correct shape
         features = extract_features("temp_audio.wav")
-        features = np.expand_dims(features, axis=0)
-
+        
+        # Predict
         prediction = model.predict(features)
         predicted_class = np.argmax(prediction, axis=1)
         label = label_encoder.inverse_transform(predicted_class)
@@ -47,3 +56,7 @@ if audio_file is not None:
         st.success(f"🗣️ Predicted Dialect: **{label[0]}**")
     except Exception as e:
         st.error(f"❌ Error processing audio: {e}")
+    finally:
+        # Clean up temporary file
+        if os.path.exists("temp_audio.wav"):
+            os.remove("temp_audio.wav")
