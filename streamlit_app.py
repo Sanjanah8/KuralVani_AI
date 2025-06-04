@@ -6,12 +6,12 @@ import pickle
 import os
 import base64
 
-# File paths
+# Paths
 MODEL_PATH = "models/tamil_slang_model.h5"
 ENCODER_PATH = "models/label_encoder.pkl"
-LOGO_PATH = "assets/tamil-logo.png"
+LOGO_PATH = "assets/tamillogo.png"
 
-# Load model and label encoder
+# Load model and encoder
 model = tf.keras.models.load_model(MODEL_PATH)
 with open(ENCODER_PATH, 'rb') as f:
     label_encoder = pickle.load(f)
@@ -23,14 +23,32 @@ def extract_features(audio_file):
     mfcc_mean = np.mean(mfcc.T, axis=0)
     return mfcc_mean
 
-# UI settings
-st.set_page_config(page_title="KuralVani AI - தமிழ் வட்டார வழக்கு", layout="centered")
+# UI Styling
+st.set_page_config(page_title="தமிழ் வாசல் - Tamil Dialect Detector", layout="centered")
 
-# Custom styles
 st.markdown("""
     <style>
-    .title { text-align: center; font-size: 36px; color: #8e44ad; font-weight: bold; font-family: 'Noto Sans Tamil', sans-serif; }
-    .sub { font-size: 20px; text-align: center; color: #555; margin-bottom: 20px; }
+    .main {
+        font-family: 'Noto Sans Tamil', sans-serif;
+    }
+    .title {
+        text-align: center;
+        font-size: 36px;
+        color: #800000;
+        font-weight: bold;
+    }
+    .sub {
+        font-size: 20px;
+        text-align: center;
+        color: #555;
+        margin-bottom: 20px;
+    }
+    .btn-upload {
+        background-color: #c0392b;
+        color: white;
+        border-radius: 8px;
+        padding: 8px 16px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -39,11 +57,11 @@ if os.path.exists(LOGO_PATH):
     st.image(LOGO_PATH, width=120)
 
 # Title
-st.markdown('<div class="title">KuralVani AI</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub">தமிழ் வட்டார வழக்கு கண்டறிதல் (Tamil Dialect Prediction from Audio)</div>', unsafe_allow_html=True)
+st.markdown('<div class="title">தமிழ் வட்டார வழக்கு கண்டறிதல்</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub">Upload a Tamil audio file (.wav or .mp3) and detect its dialect</div>', unsafe_allow_html=True)
 
 # Upload
-uploaded_file = st.file_uploader("🎤 உங்கள் தமிழ் ஆடியோவை பதிவேற்றுங்கள்", type=["wav", "mp3"])
+uploaded_file = st.file_uploader("🎤 ஒலி கோப்பை பதிவேற்று", type=["wav", "mp3"])
 
 if uploaded_file is not None:
     st.audio(uploaded_file)
@@ -56,12 +74,12 @@ if uploaded_file is not None:
         prediction = model.predict(features)
         predicted_class = np.argmax(prediction, axis=1)
         label = label_encoder.inverse_transform(predicted_class)[0]
-        st.success(f"🔊 கண்டறியப்பட்ட வட்டாரம்: **{label}**")
+        st.success(f"🔊 **கண்டறியப்பட்ட வட்டாரம்:** {label}")
 
-        # Download prediction as .txt
-        result_text = f"KuralVani AI Prediction: {label}"
+        # Download option
+        result_text = f"Prediction: {label}"
         b64 = base64.b64encode(result_text.encode()).decode()
-        href = f'<a href="data:file/txt;base64,{b64}" download="kuralvani_prediction.txt">📥 Download Result</a>'
+        href = f'<a href="data:file/txt;base64,{b64}" download="prediction.txt">📥 Download Result</a>'
         st.markdown(href, unsafe_allow_html=True)
     except Exception as e:
-        st.error(f"⚠️ பிழை ஏற்பட்டது: {e}")
+        st.error(f"பிழை ஏற்பட்டது: {e}")
