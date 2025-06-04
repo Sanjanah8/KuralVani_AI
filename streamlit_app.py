@@ -95,22 +95,19 @@ audio_file = st.file_uploader(
 )
 
 def extract_mfcc(file):
-    signal, sr = librosa.load(file, sr=22050)
-    mfcc = librosa.feature.mfcc(y=signal, sr=sr, n_mfcc=40)
+    y, sr = librosa.load(file, sr=22050)
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
 
-    # Pad or truncate to 40 frames
+    # Ensure (40, 40)
     if mfcc.shape[1] < 40:
         pad_width = 40 - mfcc.shape[1]
         mfcc = np.pad(mfcc, pad_width=((0, 0), (0, pad_width)), mode='constant')
     else:
         mfcc = mfcc[:, :40]
 
-    # Normalize
     mfcc = (mfcc - np.mean(mfcc)) / np.std(mfcc)
-
-    # Reshape to (40, 40, 1)
-    mfcc = mfcc.reshape(40, 40, 1)
-    return np.expand_dims(mfcc, axis=0)  # Shape (1, 40, 40, 1)
+    mfcc = mfcc.reshape(40, 40, 1)  # Shape (40, 40, 1)
+    return np.expand_dims(mfcc, axis=0)  # Final shape (1, 40, 40, 1)
 
 # Mapping English labels to Tamil
 dialect_map = {
@@ -132,7 +129,7 @@ if audio_file is not None:
         )
 
         try:
-            mfcc_input = extract_mfcc(audio_file)
+            mfcc_input = extract_mfcc(audio_file)  # shape: (1, 40, 40, 1)
             prediction = model.predict(mfcc_input)
 
             pred_index = np.argmax(prediction)
