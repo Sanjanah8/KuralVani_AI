@@ -45,18 +45,17 @@ if audio_file is not None:
         f.write(audio_file.read())
 
     try:
-        # Extract features with correct shape
-        features = extract_features("temp_audio.wav")
-        
-        # Predict
-        prediction = model.predict(features)
-        predicted_class = np.argmax(prediction, axis=1)
-        label = label_encoder.inverse_transform(predicted_class)
+    features = extract_features("temp_audio.wav")
+    prediction = model.predict(features)
 
-        st.success(f"🗣️ Predicted Dialect: **{label[0]}**")
-    except Exception as e:
-        st.error(f"❌ Error processing audio: {e}")
-    finally:
-        # Clean up temporary file
-        if os.path.exists("temp_audio.wav"):
-            os.remove("temp_audio.wav")
+    # If model returns a list, take first output
+    if isinstance(prediction, list):
+        prediction = prediction[0]
+
+    predicted_class = np.argmax(prediction, axis=1)
+    label = label_encoder.inverse_transform(predicted_class)
+
+    st.success(f"🗣️ Predicted Dialect: **{label[0]}**")
+except Exception as e:
+    st.error(f"❌ Error processing audio: {e}")
+
