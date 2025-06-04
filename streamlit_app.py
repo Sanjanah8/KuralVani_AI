@@ -2,8 +2,8 @@ import streamlit as st
 import numpy as np
 import librosa
 import tensorflow as tf
+model = tf.keras.models.load_model('models/tamil_slang_model.h5')
 
-model = tf.keras.models.load_model('models/model.h5')
 
 
 def extract_mfcc(file):
