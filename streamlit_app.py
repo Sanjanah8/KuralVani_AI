@@ -13,7 +13,7 @@ with open('models/label_encoder.pkl', 'rb') as f:
 # --- Page config ---
 st.set_page_config(
     page_title="குரல்வாணி AI - Tamil Dialect Detection",
-    page_icon="assets/tamillogo.jpeg",
+    page_icon="assets/tamilllogo.jpeg",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
