@@ -5,136 +5,138 @@ import tensorflow as tf
 import pickle
 from PIL import Image
 
-# Set page config with your app icon
-st.set_page_config(
-    page_title="குரல்வாணி AI - தமிழ் வட்டார வழக்கு கண்டறிதல்",
-    page_icon="assets/tamillogo.jpeg",
-    layout="centered",
-    initial_sidebar_state="auto",
-)
-
-# Load your trained model
+# --- Load model and label encoder ---
 model = tf.keras.models.load_model('models/tamil_slang_model.h5')
 
-# Load label encoder
 with open('models/label_encoder.pkl', 'rb') as f:
-    le = pickle.load(f)
+    label_encoder = pickle.load(f)
 
-# Function to extract MFCC features from audio file
-def extract_mfcc(audio_file, n_mfcc=40, max_len=174):
-    # Load audio file with librosa
-    y, sr = librosa.load(audio_file, sr=22050)
-    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc)
-    # Pad/truncate to fixed length for model input
-    if mfcc.shape[1] < max_len:
-        pad_width = max_len - mfcc.shape[1]
-        mfcc = np.pad(mfcc, pad_width=((0, 0), (0, pad_width)), mode='constant')
-    else:
-        mfcc = mfcc[:, :max_len]
-    # Model expects input shape (1, n_mfcc, max_len, 1)
-    mfcc = mfcc[np.newaxis, ..., np.newaxis]
-    return mfcc
+# --- Page config ---
+st.set_page_config(
+    page_title="குரல்வாணி AI - Tamil Dialect Detection",
+    page_icon="assets/tamillogo.jpeg",
+    layout="centered",
+    initial_sidebar_state="collapsed",
+)
 
-# CSS styling for pretty UI
+# --- Custom CSS for styling ---
 st.markdown(
     """
     <style>
-    .main {
-        background-color: #121212;
-        color: #E0E0E0;
+    body {
+        background-color: #f9f6f2;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    h1, h2, h3 {
-        color: #FF6F61;
+    .title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #6b2c2c;
+        margin-bottom: 0.2rem;
+    }
+    .subtitle {
+        font-size: 1.3rem;
+        color: #a34444;
+        margin-top: 0;
+        margin-bottom: 2rem;
     }
     .stButton>button {
-        background-color: #FF6F61;
+        background-color: #a34444;
         color: white;
+        font-weight: 600;
         border-radius: 8px;
-        border: none;
-        padding: 10px 25px;
-        font-weight: bold;
+        padding: 0.5rem 1.5rem;
         transition: background-color 0.3s ease;
     }
     .stButton>button:hover {
-        background-color: #FF856F;
+        background-color: #7f2a2a;
         cursor: pointer;
-        box-shadow: 0 4px 15px rgba(255,111,97,0.4);
-    }
-    .stFileUploader>div {
-        border: 2px dashed #FF6F61;
-        border-radius: 12px;
-        padding: 20px;
-        background-color: #1E1E1E;
-        color: #FFC1B3;
     }
     .confidence {
+        font-weight: 700;
+        color: #4b403f;
         font-size: 1.1rem;
-        font-weight: 600;
-        color: #FFD54F;
+        margin-top: 1rem;
+    }
+    .gif-center {
+        text-align: center;
+        margin: 10px 0;
     }
     </style>
-    """, unsafe_allow_html=True
-)
-
-# Show app logo
-logo_img = Image.open("assets/tamillogo.jpeg")
-st.image(logo_img, width=160, caption="குரல்வாணி AI - Tamil Dialect Detector")
-
-# App title and description
-st.title("குரல்வாணி AI - தமிழ் வட்டார வழக்கு கண்டறிதல்")
-st.markdown(
-    """
-    தமிழில் பேசும் இடம் எங்கே என்று இந்த ஆடியோவால் கண்டறியுங்கள்.  
-    Detect the regional Tamil dialect from this audio.
-    """
-)
-
-# Upload audio file
-audio_file = st.file_uploader("ஆடியோ பதிவேற்று (.wav, .mp3) / Upload audio (.wav, .mp3)", type=['wav','mp3'])
-
-# Show waveform gif below uploader as animation
-st.markdown("""
-    <div style="text-align:center; margin: 10px 0;">
-      <img src="https://media.giphy.com/media/l0MYA6PQFO1SxPaxu/giphy.gif" alt="Waveform" width="300" />
-    </div>
-    """, unsafe_allow_html=True)
-
-if audio_file is not None:
-    # Extract features and predict
-    mfcc_features = extract_mfcc(audio_file)
-    prediction = model.predict(mfcc_features)
-    pred_index = np.argmax(prediction)
-    pred_label = le.inverse_transform([pred_index])[0]
-    confidence = prediction[0][pred_index] * 100
-
-    # Show result with some spacing and styling
-    st.markdown(f"### வட்டார வழக்கு / Dialect: **{pred_label}**")
-    st.markdown(f"<p class='confidence'>நம்பிக்கை / Confidence: {confidence:.2f}%</p>", unsafe_allow_html=True)
-
-    # Extra info - you can customize this mapping if you have
-    dialect_info = {
-        "திருநெல்வேலி": "திருநெல்வேலி மாவட்டத்தின் ஆங்கிலத்தன்மை கொண்ட தமிழ் வட்டார வழக்கு.",
-        "சென்னை": "சென்னை நகரத்தின் நகர்ப்புற தமிழ் வட்டார வழக்கு.",
-        "கோயம்புத்தூர்": "கோயம்புத்தூர் மாவட்டத்தின் ஆங்கிலத்தன்மை கொண்ட தமிழ் வட்டார வழக்கு.",
-        "மதுரை": "மதுரை மாவட்டத்தின் ஆங்கிலத்தன்மை கொண்ட தமிழ் வட்டார வழக்கு.",
-        "இலங்கை தமிழ்": "இலங்கையில் பேசப்படும் தமிழ் வட்டார வழக்கு.",
-        # Add more as per your label encoder classes
-    }
-
-    extra_text = dialect_info.get(pred_label, "இந்த வட்டார வழக்கு பற்றிய கூடுதல் தகவல் கிடைக்கவில்லை.")
-    st.markdown(f"**குறிப்பு / Note:** {extra_text}")
-
-else:
-    st.info("தயவு செய்து தமிழ் வட்டார வழக்கு கொண்ட ஆடியோவை பதிவேற்றவும். / Please upload an audio file with Tamil dialect.")
-
-# Footer
-st.markdown(
-    """
-    <hr style="border:1px solid #FF6F61;">
-    <p style="text-align:center; color:#B0B0B0;">
-    © 2025 குரல்வாணி AI - Tamil Dialect Detection
-    </p>
     """,
     unsafe_allow_html=True,
 )
+
+# --- App Logo (tamillogo.jpeg) ---
+logo = Image.open('assets/tamillogo.jpeg')
+st.image(logo, width=140)
+
+# --- Titles ---
+st.markdown('<h1 class="title">குரல்வாணி AI - தமிழ் வட்டார வழக்கு கண்டறிதல்</h1>', unsafe_allow_html=True)
+st.markdown('<h3 class="subtitle">KuralVani AI - Tamil Dialect Detection</h3>', unsafe_allow_html=True)
+
+st.write("**தமிழ் பேசும் இடம் எங்கே என்று இந்த ஆடியோவால் கண்டறியுங்கள்.**")
+st.write("**Detect the regional Tamil dialect from this audio.**")
+st.write("---")
+
+# --- File uploader ---
+audio_file = st.file_uploader(
+    "தயவு செய்து கீழே உங்கள் தமிழ் வட்டார வழக்கு கொண்ட ஆடியோவை பதிவேற்றவும்.\nPlease upload your Tamil dialect audio file (.wav, .mp3)",
+    type=['wav', 'mp3']
+)
+
+def extract_mfcc(file):
+    # Load audio with librosa
+    signal, sr = librosa.load(file, sr=22050)
+    # Extract MFCCs with 40 coefficients, fixed length 40 frames
+    mfcc = librosa.feature.mfcc(signal, sr=sr, n_mfcc=40)
+    # Pad or truncate to 40 frames
+    if mfcc.shape[1] < 40:
+        pad_width = 40 - mfcc.shape[1]
+        mfcc = np.pad(mfcc, pad_width=((0,0),(0,pad_width)), mode='constant')
+    else:
+        mfcc = mfcc[:, :40]
+    # Normalize mfcc
+    mfcc = (mfcc - np.mean(mfcc)) / np.std(mfcc)
+    # Reshape for model: (40, 40, 1)
+    mfcc = mfcc[..., np.newaxis]
+    return mfcc
+
+if audio_file is not None:
+    # Show waveform GIF while predicting
+    with st.spinner("பதிலுக்கு கணினி கணக்கிடுகிறது... / Computing prediction..."):
+        st.markdown(
+            """
+            <div class="gif-center">
+                <img src="https://media.giphy.com/media/l0MYA6PQFO1SxPaxu/giphy.gif" alt="Waveform animation" width="300" />
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        try:
+            mfccs = extract_mfcc(audio_file)
+            mfccs = np.expand_dims(mfccs, axis=0)  # batch dimension
+
+            prediction = model.predict(mfccs)
+            pred_index = np.argmax(prediction)
+            pred_label = label_encoder.inverse_transform([pred_index])[0]
+            confidence = prediction[0][pred_index] * 100
+
+            dialect_map = {
+                'chennai': 'சென்னை (Chennai)',
+                'madurai': 'மதுரை (Madurai)',
+                'tirunelveli': 'திருநெல்வேலி (Tirunelveli)',
+                'srilanka': 'இலங்கை (Sri Lanka)',
+                'standard': 'ஸ்டான்டர்டு தமிழ் (Standard Tamil)'
+            }
+
+            pred_label_tamil = dialect_map.get(pred_label.lower(), pred_label)
+
+            st.success(f"வட்டார வழக்கு: {pred_label_tamil} / Dialect: {pred_label_tamil}")
+            st.markdown(f'<p class="confidence">நம்பிக்கை / Confidence: {confidence:.2f}%</p>', unsafe_allow_html=True)
+
+        except Exception as e:
+            st.error(f"⚠️ பிழை ஏற்பட்டது: {str(e)}")
+
+# --- Footer ---
+st.markdown("---")
+st.write("**Developed by KuralVani AI Team** | © 2025")
