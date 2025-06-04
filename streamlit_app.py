@@ -77,7 +77,7 @@ st.markdown(
 )
 
 # --- Logo ---
-logo = Image.open('assets/tamillogo.png')
+logo = Image.open('assets/tamillogo.jpeg')
 st.image(logo, width=120)
 
 # --- Title and instructions ---
