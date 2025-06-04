@@ -3,7 +3,8 @@ import numpy as np
 import librosa
 import tensorflow as tf
 
-model = tf.keras.models.load_model('model.h5')
+model = tf.keras.models.load_model('models/model.h5')
+
 
 def extract_mfcc(file):
     y, sr = librosa.load(file, sr=22050)
