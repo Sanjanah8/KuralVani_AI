@@ -1,67 +1,58 @@
 import streamlit as st
-import numpy as np
-import librosa
 import tensorflow as tf
+import numpy as np
 import pickle
-import os
-import base64
 
-# File paths
-MODEL_PATH = "models/tamil_slang_model.h5"
-ENCODER_PATH = "models/label_encoder.pkl"
-LOGO_PATH = "assets/tamil-logo.png"
+# ----------- Load your model and label encoder -----------
 
-# Load model and label encoder
-model = tf.keras.models.load_model(MODEL_PATH)
-with open(ENCODER_PATH, 'rb') as f:
-    label_encoder = pickle.load(f)
+@st.cache_resource(show_spinner=True)
+def load_model():
+    model = tf.keras.models.load_model('model.h5')
+    return model
 
-# Feature extraction
-def extract_features(audio_file):
-    y, sr = librosa.load(audio_file, sr=22050)
-    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-    mfcc_mean = np.mean(mfcc.T, axis=0)
-    return mfcc_mean
+@st.cache_resource(show_spinner=True)
+def load_label_encoder():
+    with open('label_encoder.pkl', 'rb') as f:
+        le = pickle.load(f)
+    return le
 
-# UI settings
-st.set_page_config(page_title="KuralVani AI - தமிழ் வட்டார வழக்கு", layout="centered")
+model = load_model()
+label_encoder = load_label_encoder()
 
-# Custom styles
-st.markdown("""
-    <style>
-    .title { text-align: center; font-size: 36px; color: #8e44ad; font-weight: bold; font-family: 'Noto Sans Tamil', sans-serif; }
-    .sub { font-size: 20px; text-align: center; color: #555; margin-bottom: 20px; }
-    </style>
-""", unsafe_allow_html=True)
+# ----------- App UI -----------
 
-# Logo
-if os.path.exists(LOGO_PATH):
-    st.image(LOGO_PATH, width=120)
+st.title("KuralVani AI - Tamil Slang Dialect Detection")
 
-# Title
-st.markdown('<div class="title">KuralVani AI</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub">தமிழ் வட்டார வழக்கு கண்டறிதல் (Tamil Dialect Prediction from Audio)</div>', unsafe_allow_html=True)
+st.write("""
+Upload a Tamil audio file (.wav) and the app will classify it into one of five dialects using a deep learning model.
+""")
 
-# Upload
-uploaded_file = st.file_uploader("🎤 உங்கள் தமிழ் ஆடியோவை பதிவேற்றுங்கள்", type=["wav", "mp3"])
+audio_file = st.file_uploader("Upload Audio", type=["wav"])
 
-if uploaded_file is not None:
-    st.audio(uploaded_file)
-    with open("temp_audio.wav", "wb") as f:
-        f.write(uploaded_file.read())
+# ----------- Helper: extract features (MFCC) -----------
 
-    try:
-        features = extract_features("temp_audio.wav")
-        features = np.expand_dims(features, axis=0)
-        prediction = model.predict(features)
-        predicted_class = np.argmax(prediction, axis=1)
-        label = label_encoder.inverse_transform(predicted_class)[0]
-        st.success(f"🔊 கண்டறியப்பட்ட வட்டாரம்: **{label}**")
+import librosa
 
-        # Download prediction as .txt
-        result_text = f"KuralVani AI Prediction: {label}"
-        b64 = base64.b64encode(result_text.encode()).decode()
-        href = f'<a href="data:file/txt;base64,{b64}" download="kuralvani_prediction.txt">📥 Download Result</a>'
-        st.markdown(href, unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"⚠️ பிழை ஏற்பட்டது: {e}")
+def extract_mfcc(file):
+    y, sr = librosa.load(file, sr=22050)  # Load audio
+    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
+    mfccs_scaled = np.mean(mfccs.T, axis=0)
+    return mfccs_scaled.reshape(1, -1)  # Shape (1, 40)
+
+# ----------- Predict button -----------
+
+if audio_file is not None:
+    st.audio(audio_file, format='audio/wav')
+    
+    if st.button("Predict Dialect"):
+        with st.spinner("Extracting features and predicting..."):
+            # Extract MFCC features from uploaded file
+            mfcc_features = extract_mfcc(audio_file)
+            
+            # Predict with the model
+            preds = model.predict(mfcc_features)
+            pred_class_index = np.argmax(preds, axis=1)[0]
+            pred_class_label = label_encoder.inverse_transform([pred_class_index])[0]
+            
+            st.success(f"Predicted Dialect: **{pred_class_label}**")
+            st.write(f"Confidence: {preds[0][pred_class_index]*100:.2f}%")
