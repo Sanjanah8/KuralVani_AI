@@ -125,7 +125,7 @@ if audio_file is not None:
     with st.spinner("🔍 கணிப்பிக்கிறது... / Computing prediction..."):
         st.markdown(
             '<div class="gif-container">'
-            '<img src="https://i.gifer.com/origin/5f/5f8ed9e745a502a54ff52e37496e715a.gif" width="120" alt="waveform gif"/>'
+            '<img src="assets/waveform.gif" width="120" alt="waveform gif"/>'
             '</div>', 
             unsafe_allow_html=True
         )
