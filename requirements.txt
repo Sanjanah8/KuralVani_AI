@@ -3,3 +3,6 @@ librosa
 tensorflow
 scikit-learn
 numpy
+pandas
+
+
