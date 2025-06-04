@@ -1,58 +1,54 @@
 import streamlit as st
-import tensorflow as tf
 import numpy as np
-import pickle
-
-# ----------- Load your model and label encoder -----------
-
-@st.cache_resource(show_spinner=True)
-def load_model():
-    model = tf.keras.models.load_model('model.h5')
-    return model
-
-@st.cache_resource(show_spinner=True)
-def load_label_encoder():
-    with open('label_encoder.pkl', 'rb') as f:
-        le = pickle.load(f)
-    return le
-
-model = load_model()
-label_encoder = load_label_encoder()
-
-# ----------- App UI -----------
-
-st.title("KuralVani AI - Tamil Slang Dialect Detection")
-
-st.write("""
-Upload a Tamil audio file (.wav) and the app will classify it into one of five dialects using a deep learning model.
-""")
-
-audio_file = st.file_uploader("Upload Audio", type=["wav"])
-
-# ----------- Helper: extract features (MFCC) -----------
-
 import librosa
+import tensorflow as tf
+
+model = tf.keras.models.load_model('model.h5')
 
 def extract_mfcc(file):
-    y, sr = librosa.load(file, sr=22050)  # Load audio
-    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-    mfccs_scaled = np.mean(mfccs.T, axis=0)
-    return mfccs_scaled.reshape(1, -1)  # Shape (1, 40)
-
-# ----------- Predict button -----------
-
-if audio_file is not None:
-    st.audio(audio_file, format='audio/wav')
+    y, sr = librosa.load(file, sr=22050)
+    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)  # shape (40, time_steps)
+    max_pad_len = 40
     
-    if st.button("Predict Dialect"):
-        with st.spinner("Extracting features and predicting..."):
-            # Extract MFCC features from uploaded file
-            mfcc_features = extract_mfcc(audio_file)
-            
-            # Predict with the model
-            preds = model.predict(mfcc_features)
-            pred_class_index = np.argmax(preds, axis=1)[0]
-            pred_class_label = label_encoder.inverse_transform([pred_class_index])[0]
-            
-            st.success(f"Predicted Dialect: **{pred_class_label}**")
-            st.write(f"Confidence: {preds[0][pred_class_index]*100:.2f}%")
+    if mfccs.shape[1] < max_pad_len:
+        pad_width = max_pad_len - mfccs.shape[1]
+        mfccs = np.pad(mfccs, pad_width=((0,0),(0,pad_width)), mode='constant')
+    else:
+        mfccs = mfccs[:, :max_pad_len]
+    
+    mfccs = mfccs[..., np.newaxis]  # shape (40, 40, 1)
+    mfccs = np.expand_dims(mfccs, axis=0)  # shape (1, 40, 40, 1)
+    return mfccs.astype(np.float32)
+
+dialect_labels = [
+    'சென்னை (Chennai)', 
+    'மதுரை (Madurai)', 
+    'திருநெல்வேலி (Tirunelveli)', 
+    'இலங்கை (Sri Lanka)', 
+    'ஸ்டாண்டர்ட் (Standard)'
+]
+
+st.title('குரல்வாணி AI - தமிழ் வட்டார வழக்கு கண்டறிதல்\nKuralVani AI - Tamil Dialect Detection')
+
+st.write('''  
+தமிழ் பேசும் இடம் எங்கே என்று இந்த ஆடியோவால் கண்டறியுங்கள்.  
+Detect the regional Tamil dialect from this audio.  
+
+தயவு செய்து கீழே உங்கள் தமிழ் வட்டார வழக்கு கொண்ட ஆடியோவை பதிவேற்றவும்.  
+Please upload your Tamil dialect audio file below.  
+''')
+
+uploaded_file = st.file_uploader("ஆடியோ பதிவேற்று (.wav, .mp3) / Upload audio (.wav, .mp3)", type=["wav", "mp3"])
+
+if uploaded_file is not None:
+    st.audio(uploaded_file, format='audio/wav')
+
+    with st.spinner('மாதிரி கணக்கிடுகிறது... தயவு செய்து காத்திருங்கள். / Predicting... please wait.'):
+        mfcc_features = extract_mfcc(uploaded_file)
+        preds = model.predict(mfcc_features)
+        pred_index = np.argmax(preds)
+        pred_label = dialect_labels[pred_index]
+        confidence = preds[0][pred_index] * 100
+
+    st.success(f"வட்டார வழக்கு: **{pred_label}** / Dialect: **{pred_label}**")
+    st.write(f"நம்பிக்கை / Confidence: {confidence:.2f}%")
