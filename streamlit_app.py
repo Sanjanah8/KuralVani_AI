@@ -7,7 +7,7 @@ import pickle
 
 @st.cache_resource(show_spinner=True)
 def load_model():
-    model = tf.keras.models.load_model('tamil_slang_model.h5')
+    model = tf.keras.models.load_model('models/tamil_slang_model.h5')
     return model
 
 @st.cache_resource(show_spinner=True)
