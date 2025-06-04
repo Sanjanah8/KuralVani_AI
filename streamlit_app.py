@@ -12,7 +12,7 @@ def load_model():
 
 @st.cache_resource(show_spinner=True)
 def load_label_encoder():
-    with open('label_encoder.pkl', 'rb') as f:
+    with open('models/label_encoder.pkl', 'rb') as f:
         le = pickle.load(f)
     return le
 
