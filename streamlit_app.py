@@ -128,7 +128,6 @@ dialect_map = {
 }
 
 if audio_file is not None:
-    # Show waveform gif while predicting
     with st.spinner("பதிலுக்கு கணினி கணக்கிடுகிறது... / Computing prediction..."):
         st.markdown(
             '<div class="gif-container">'
@@ -136,7 +135,6 @@ if audio_file is not None:
             '</div>', 
             unsafe_allow_html=True
         )
-        
         try:
             mfccs = extract_mfcc(audio_file)
             prediction = model.predict(mfccs)
